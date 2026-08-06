@@ -1,0 +1,1229 @@
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Routerra.id - Buat Perencanaan Rute & Batch</title>
+    
+    <!-- Favicon Huruf R -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23000000'/><text x='50%' y='55%' dominant-baseline='central' text-anchor='middle' fill='%23ffffff' font-family='sans-serif' font-weight='900' font-size='65'>R</text></svg>">
+
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        classic: {
+                            bg: '#000000',
+                            panel: '#0a0a0a',
+                            card: '#121212',
+                            border: '#262626',
+                            borderLight: '#404040',
+                            text: '#ffffff',
+                            muted: '#a3a3a3',
+                            accent: '#ffffff',
+                            blue: '#2563eb',
+                            emerald: '#059669',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Leaflet MarkerCluster CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+    <!-- PapaParse CDN & SheetJS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <style>
+        #map { height: 100%; width: 100%; z-index: 1; background: #e2e8f0; }
+
+        /* Marker Formatting */
+        .marker-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+        }
+
+        .custom-marker {
+            background: #2563eb;
+            color: #ffffff;
+            border-radius: 50%;
+            width: 26px;
+            height: 26px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 11px;
+            border: 2px solid #ffffff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease;
+        }
+        
+        /* Titik Terpilih - Merah Klasik */
+        .custom-marker.selected {
+            background: #dc2626 !important;
+            border-color: #ffffff !important;
+            color: #ffffff !important;
+            transform: scale(1.25);
+            box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.3);
+        }
+        
+        /* Titik Sudah Dibatch - Hijau Klasik */
+        .custom-marker.batched {
+            background: #059669;
+            border-color: #ffffff;
+            color: #ffffff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
+        .marker-label {
+            background: #000000;
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #404040;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            margin-bottom: 4px;
+            pointer-events: none;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .marker-label.batched-label {
+            border-color: #059669;
+            color: #34d399;
+            background: #000000;
+        }
+
+        .box-select-active #map { cursor: crosshair !important; }
+
+        /* Leaflet Dark Popup Custom */
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+            background: #0a0a0a !important;
+            border: 1px solid #262626;
+            color: #ffffff !important;
+            border-radius: 8px !important;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8) !important;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: #000000; }
+        ::-webkit-scrollbar-thumb { background: #262626; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: #404040; }
+    </style>
+</head>
+<body class="bg-classic-bg text-classic-text font-sans h-screen flex flex-col overflow-hidden select-none">
+
+    <!-- Top Header -->
+    <header class="h-16 bg-classic-panel border-b border-classic-border flex items-center justify-between px-6 shrink-0 z-20">
+        <div class="flex items-center gap-3">
+            <div class="bg-black border border-classic-borderLight text-white font-bold px-3 py-1 rounded-md text-base tracking-tight">
+                RRA<span class="text-xs text-classic-muted">.ID</span>
+            </div>
+            <div>
+                <h1 class="font-bold text-sm tracking-tight text-white flex items-center gap-2">
+                    Routerra.id <span class="bg-neutral-900 text-neutral-400 text-[10px] px-2 py-0.5 rounded font-mono border border-neutral-800">v2.5</span>
+                </h1>
+                <p class="text-[11px] text-classic-muted font-mono">Dispatcher Manage</p>
+            </div>
+        </div>
+
+        <!-- Central Action Bar -->
+        <div class="flex items-center gap-2.5">
+            <button onclick="openTutorialModal()" 
+                class="bg-black hover:bg-neutral-900 text-neutral-300 text-xs font-medium px-3 py-2 rounded-md border border-classic-border transition flex items-center gap-1.5">
+                <span>📄</span> Panduan
+            </button>
+
+            <!-- Toggle Mode Box Select -->
+            <button id="btnToggleBoxSelect" onclick="toggleBoxSelectMode()" 
+                class="bg-black hover:bg-neutral-900 text-neutral-300 text-xs font-medium px-3 py-2 rounded-md border border-classic-border transition flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-neutral-600" id="boxSelectDot"></span>
+                <span id="boxSelectStatusText">Box Select: OFF</span>
+            </button>
+
+            <div class="relative">
+                <input type="text" id="searchInput" placeholder="Cari Order ID, Nama..." 
+                    class="bg-black border border-classic-border text-xs text-white pl-8 pr-3 py-2 rounded-md w-44 focus:outline-none focus:border-neutral-500 transition placeholder-neutral-600">
+                <span class="absolute left-2.5 top-2.5 text-xs text-neutral-500">🔍</span>
+            </div>
+
+            <label class="bg-white hover:bg-neutral-200 cursor-pointer text-xs font-bold px-4 py-2 rounded-md transition text-black shrink-0">
+                Import CSV
+                <input type="file" id="csvFileInput" accept=".csv" class="hidden">
+            </label>
+
+            <!-- Simpan Ke Batch Manual -->
+            <button id="btnOpenBatchModal" disabled onclick="openBatchModal()"
+                class="bg-neutral-900 border border-neutral-700 text-white hover:bg-white hover:text-black disabled:opacity-30 disabled:pointer-events-none text-xs font-medium px-4 py-2 rounded-md transition shrink-0">
+                + Batch (<span id="selectedCountBtn">0</span>)
+            </button>
+
+            <!-- Export Excel -->
+            <div class="flex items-center gap-1 bg-black p-1 rounded-md border border-classic-border shrink-0">
+                <input type="text" id="exportFileNameInput" placeholder="Nama File (Opsional)" 
+                    class="bg-transparent border-none text-xs text-white px-2.5 py-1 focus:outline-none w-32 placeholder-neutral-600">
+                
+                <button id="btnExportAllExcel" disabled onclick="exportAllBatchesToExcel()"
+                    class="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-30 disabled:pointer-events-none text-xs font-medium px-3 py-1.5 rounded transition text-white flex items-center gap-1.5 shrink-0">
+                    <span>📊 Export</span>
+                    <span id="exportLockBadge" class="bg-neutral-900 text-[9px] px-1.5 py-0.5 rounded text-amber-400 font-mono">Lengkapi</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main App Container -->
+    <div class="flex flex-1 overflow-hidden p-3 gap-3">
+        <!-- Sidebar Panel -->
+        <aside class="w-80 bg-classic-panel border border-classic-border rounded-xl flex flex-col p-4 gap-3 shrink-0">
+            <!-- Progress Dynamic Card -->
+            <div class="bg-black p-3 rounded-lg border border-classic-border space-y-2">
+                <div class="flex justify-between items-center text-xs">
+                    <span class="text-classic-muted font-medium">Batch Progress:</span>
+                    <strong id="progressText" class="text-white font-mono font-bold">0 / 0 (0%)</strong>
+                </div>
+                <div class="w-full bg-neutral-900 h-1.5 rounded-full overflow-hidden border border-neutral-800">
+                    <div id="progressBar" class="bg-white h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <p id="progressStatusHint" class="text-[10px] text-classic-muted italic">
+                    💡 Aktifkan <b>Box Select</b>, lalu tahan <b>Klik Kiri & Drag</b> di peta untuk memilih titik.
+                </p>
+            </div>
+
+            <!-- Dashboard Quick Metrics -->
+            <div class="grid grid-cols-3 gap-2 text-center">
+                <div class="bg-black p-2 rounded-lg border border-classic-border">
+                    <span class="text-[9px] text-classic-muted uppercase font-bold tracking-wider font-mono">TOTAL</span>
+                    <p id="totalCount" class="text-sm font-bold text-white mt-0.5 font-mono">0</p>
+                </div>
+                <div class="bg-black p-2 rounded-lg border border-classic-border">
+                    <span class="text-[9px] text-classic-muted uppercase font-bold tracking-wider font-mono">UNBATCHED</span>
+                    <p id="unbatchedCount" class="text-sm font-bold text-amber-400 mt-0.5 font-mono">0</p>
+                </div>
+                <div class="bg-black p-2 rounded-lg border border-classic-border">
+                    <span class="text-[9px] text-classic-muted uppercase font-bold tracking-wider font-mono">BATCHES</span>
+                    <p id="savedBatchCount" class="text-sm font-bold text-white mt-0.5 font-mono">0</p>
+                </div>
+            </div>
+
+            <!-- List Batches -->
+            <div class="border-b border-classic-border pb-3">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-[10px] font-bold text-classic-muted tracking-wider uppercase font-mono">Daftar Batch</h3>
+                    <button onclick="clearAllBatches()" class="text-[10px] text-red-400 hover:underline">Reset All</button>
+                </div>
+                <div id="savedBatchesContainer" class="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+                    <p class="text-[11px] text-neutral-500 italic">Belum ada batch tersimpan.</p>
+                </div>
+            </div>
+
+            <!-- List Locations -->
+            <div class="flex-1 flex flex-col min-h-0 overflow-hidden space-y-2">
+                <div class="flex items-center justify-between shrink-0 gap-2">
+                    <h3 class="text-[10px] font-bold text-classic-muted tracking-wider uppercase font-mono">Daftar Lokasi</h3>
+                    
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <select id="cityFilterSelect" onchange="renderData()" 
+                            class="bg-black border border-classic-border text-[10px] text-white font-medium px-2 py-1 rounded focus:outline-none max-w-[100px] truncate">
+                            <option value="">Semua Kota</option>
+                        </select>
+
+                        <button id="btnFilterUnbatched" onclick="toggleUnbatchedFilter()" 
+                            class="text-[10px] font-medium px-2 py-1 rounded bg-black text-neutral-300 border border-classic-border hover:bg-neutral-900 transition shrink-0">
+                            🎯 Sisa Unbatch
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex-1 overflow-y-auto space-y-2 pr-1" id="locationList">
+                    <p class="text-xs text-neutral-500 italic">Silakan unggah file CSV untuk menampilkan data.</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center Canvas: Light Map -->
+        <main class="flex-1 border border-classic-border rounded-xl overflow-hidden relative" id="mapContainer">
+            <div id="map"></div>
+        </main>
+    </div>
+
+    <!-- MODAL 1: BATCHING OPTION AFTER CSV IMPORT -->
+    <div id="importOptionsModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[110] hidden flex items-center justify-center p-4">
+        <div class="bg-classic-panel border border-classic-border rounded-xl w-full max-w-md p-6 space-y-5 text-white">
+            <div class="flex items-center justify-between border-b border-classic-border pb-3">
+                <h3 class="font-bold text-base text-white flex items-center gap-2">
+                    <span>🚀</span> Import Berhasil
+                </h3>
+                <button onclick="closeImportOptionsModal()" class="text-neutral-500 hover:text-white">&times;</button>
+            </div>
+
+            <p class="text-xs text-neutral-300 leading-relaxed">
+                Terdeteksi <strong id="importedCountText" class="text-white font-mono text-sm">0</strong> titik lokasi. Pilih metode pembagian batch:
+            </p>
+
+            <div class="space-y-2.5">
+                <div onclick="selectBatchingMode('manual')" class="p-3.5 bg-black hover:border-neutral-500 border border-classic-border rounded-lg cursor-pointer transition flex items-start gap-3 group">
+                    <div class="text-xl">🖱️</div>
+                    <div>
+                        <h4 class="font-semibold text-white text-xs group-hover:underline transition">Batching Manual (Box Select / Klik)</h4>
+                        <p class="text-[11px] text-classic-muted mt-0.5">Pilih sendiri titik lokasi di peta secara fleksibel.</p>
+                    </div>
+                </div>
+
+                <div onclick="selectBatchingMode('auto')" class="p-3.5 bg-black hover:border-neutral-500 border border-classic-border rounded-lg cursor-pointer transition flex items-start gap-3 group">
+                    <div class="text-xl">🤖</div>
+                    <div>
+                        <h4 class="font-semibold text-white text-xs group-hover:underline transition">Auto-Cluster (Otomatis)</h4>
+                        <p class="text-[11px] text-classic-muted mt-0.5">Membagi kelompok otomatis berdasarkan jarak & kuota.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="autoClusterForm" class="hidden space-y-3 bg-black p-3.5 rounded-lg border border-classic-border text-xs">
+                <h5 class="font-bold text-neutral-300 text-[10px] tracking-wider uppercase font-mono">Kriteria Cluster Otomatis:</h5>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] text-classic-muted mb-1">Maks Titik / Batch</label>
+                        <input type="number" id="maxPointsInput" value="10" min="1" 
+                            class="w-full bg-classic-panel border border-classic-border rounded px-3 py-1.5 text-white font-mono focus:outline-none focus:border-neutral-400">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-classic-muted mb-1">Maks Radius (KM)</label>
+                        <input type="number" id="maxRadiusInput" value="15" min="0.5" step="0.5" 
+                            class="w-full bg-classic-panel border border-classic-border rounded px-3 py-1.5 text-white font-mono focus:outline-none focus:border-neutral-400">
+                    </div>
+                </div>
+                <button onclick="executeAutoClustering()" class="w-full bg-white hover:bg-neutral-200 text-black font-bold py-2 rounded transition text-xs">
+                    Generate Clusters
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: MOVE POINT TO ANOTHER BATCH -->
+    <div id="movePointModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[120] hidden flex items-center justify-center p-4">
+        <div class="bg-classic-panel border border-classic-border rounded-xl w-full max-w-sm p-5 space-y-4 text-white">
+            <div class="flex items-center justify-between border-b border-classic-border pb-2">
+                <h3 class="font-bold text-sm text-white flex items-center gap-1.5">
+                    <span>⇄</span> Pindahkan Titik Batch
+                </h3>
+                <button onclick="closeMovePointModal()" class="text-neutral-500 hover:text-white">&times;</button>
+            </div>
+
+            <div class="bg-black p-3 rounded-lg border border-classic-border text-xs space-y-1">
+                <p class="text-classic-muted text-[10px]">Pelanggan / Order ID:</p>
+                <p id="movePointTargetName" class="font-bold text-white text-xs"></p>
+                <p id="movePointCurrentBatch" class="text-neutral-300 font-mono text-[10px] mt-1"></p>
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-classic-muted mb-1">Pilih Batch Tujuan:</label>
+                <select id="targetBatchSelect" class="w-full bg-black border border-classic-border rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-neutral-400">
+                </select>
+            </div>
+
+            <div class="flex gap-2 justify-end pt-1">
+                <button onclick="closeMovePointModal()" class="px-3 py-1.5 text-xs text-classic-muted hover:text-white">Batal</button>
+                <button onclick="executeMovePoint()" class="bg-white text-black font-bold text-xs px-4 py-1.5 rounded transition">
+                    Simpan Perubahan
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL TUTORIAL -->
+    <div id="tutorialModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+        <div class="bg-classic-panel border border-classic-border rounded-xl w-full max-w-lg p-6 space-y-5 text-white">
+            <div class="flex items-center justify-between border-b border-classic-border pb-3">
+                <div class="flex items-center gap-2">
+                    <span class="bg-black border border-classic-border text-white p-1 rounded font-bold text-xs font-mono">RRA.ID</span>
+                    <h3 class="font-bold text-base text-white">Panduan Routerra.id</h3>
+                </div>
+                <button onclick="closeTutorialModal()" class="text-neutral-500 hover:text-white text-xl">&times;</button>
+            </div>
+
+            <div class="space-y-3 text-xs leading-relaxed max-h-[60vh] overflow-y-auto pr-1">
+                <div class="bg-black p-3.5 rounded-lg border border-classic-border space-y-2">
+                    <h4 class="font-semibold text-white text-xs flex items-center gap-1.5">
+                        <span>📥</span> 1. Format CSV
+                    </h4>
+                    <p class="text-neutral-300">
+                        Upload berkas berformat <strong>.CSV</strong>. Kolom minimal yang dibutuhkan:
+                    </p>
+                    <p class="text-neutral-400 font-mono text-[10px] bg-classic-panel p-2 rounded border border-classic-border">
+                        Order ID, Nama, No Telepon, Alamat, Keterangan, Longitude, Latitude
+                    </p>
+                    <button onclick="downloadSampleCSV()" class="w-full mt-1 bg-classic-panel border border-classic-border text-neutral-200 hover:bg-neutral-800 font-medium py-2 px-3 rounded transition flex items-center justify-center gap-2 text-xs">
+                        <span>📄</span> Download Contoh File CSV Sampel
+                    </button>
+                </div>
+
+                <div class="bg-black p-3.5 rounded-lg border border-classic-border space-y-1.5">
+                    <h4 class="font-semibold text-white text-xs flex items-center gap-1.5">
+                        <span>🗺️</span> 2. Edit Batch di Peta
+                    </h4>
+                    <ul class="list-disc list-inside text-neutral-300 space-y-1">
+                        <li>Klik titik marker di peta yang sudah masuk batch.</li>
+                        <li>Klik <strong>"✏️ Ubah Batch"</strong> untuk memindahkan titik ke batch lain.</li>
+                        <li>Klik <strong>"❌ Lepas"</strong> untuk mengeluarkan titik dari batch.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="flex justify-end pt-2 border-t border-classic-border">
+                <button onclick="closeTutorialModal()" class="bg-white hover:bg-neutral-200 text-black font-bold text-xs px-5 py-2.5 rounded transition">
+                    Saya Mengerti
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Form Buat Batch Manual -->
+    <div id="batchModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-classic-panel border border-classic-border rounded-xl w-full max-w-md p-6 space-y-4">
+            <div class="flex items-center justify-between border-b border-classic-border pb-3">
+                <h3 class="font-bold text-base text-white">Simpan Ke Batch</h3>
+                <button onclick="closeBatchModal()" class="text-neutral-500 hover:text-white">&times;</button>
+            </div>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-classic-muted mb-1">Nama Batch</label>
+                    <input type="text" id="batchNameInput" placeholder="Contoh: Batch 1 - Jakarta Barat" 
+                        class="w-full bg-black border border-classic-border rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-neutral-400">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-classic-muted mb-1">Tanggal Rencana</label>
+                    <input type="date" id="batchDateInput" 
+                        class="w-full bg-black border border-classic-border rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-neutral-400">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-classic-muted mb-1">Catatan / Driver (Opsional)</label>
+                    <textarea id="batchNotesInput" rows="2" placeholder="Nama Kurir / Catatan Pengiriman..." 
+                        class="w-full bg-black border border-classic-border rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-neutral-400"></textarea>
+                </div>
+                <div class="bg-black p-3 rounded border border-classic-border text-xs space-y-1">
+                    <p class="text-neutral-300">📍 Titik Dipilih: <strong id="modalSelectedCount" class="text-white font-mono">0</strong> titik</p>
+                    <p class="text-classic-muted text-[11px]">Rute batch ini akan diurutkan secara otomatis (Nearest Neighbor).</p>
+                </div>
+            </div>
+
+            <div class="flex gap-2 justify-end pt-2">
+                <button onclick="closeBatchModal()" class="px-4 py-2 text-xs font-medium text-classic-muted hover:text-white">Batal</button>
+                <button onclick="saveBatchToList()" class="bg-white text-black font-bold text-xs px-5 py-2 rounded transition">
+                    💾 Simpan Batch Ini
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Logic Routerra -->
+    <script>
+        let locations = [];
+        let selectedIds = new Set();
+        let savedBatches = [];
+        let map, markersClusterGroup;
+        let routePolylines = [];
+        let isBoxSelectMode = false;
+        let showOnlyUnbatched = false;
+        let movingPointId = null;
+
+        function initMap() {
+            map = L.map('map', { boxZoom: false }).setView([-6.21462, 106.84513], 12);
+
+            /* Clean Light OpenStreetMap Tiles */
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+
+            markersClusterGroup = L.markerClusterGroup({
+                showCoverageOnHover: false,
+                maxClusterRadius: 35
+            });
+            map.addLayer(markersClusterGroup);
+
+            map.on('boxzoomend', function(e) {
+                selectMarkersInBounds(e.boxZoomBounds);
+            });
+
+            document.getElementById('batchDateInput').value = new Date().toISOString().slice(0, 10);
+        }
+
+        function openTutorialModal() {
+            document.getElementById('tutorialModal').classList.remove('hidden');
+        }
+        function closeTutorialModal() {
+            document.getElementById('tutorialModal').classList.add('hidden');
+        }
+
+        function downloadSampleCSV() {
+            const csvContent = 
+`Order ID,Nama,No Telepon,Alamat,Keterangan,Longitude,Latitude
+ORD-001,Andi Pratama,08123456789,Jl. MH Thamrin No.1 Jakarta Pusat,Customer A,106.82287,-6.19322
+ORD-002,Budi Santoso,08987654321,Jl. Jend Gatot Subroto Jakarta Selatan,Customer B,106.81845,-6.23012
+ORD-003,Citra Dewi,08567890123,Jl. Pemuda Rawamangun Jakarta Timur,Customer C,106.88341,-6.19125
+ORD-004,Deni Kurniawan,08112233445,Jl. Daan Mogot Grogol Jakarta Barat,Customer D,106.78651,-6.16231
+ORD-005,Eka Rahmawati,08778899001,Jl. Yos Sudarso Sunter Jakarta Utara,Customer E,106.88123,-6.13982
+ORD-006,Fajar Siddik,08129988776,Jl. Tunjungan Surabaya,Customer F,112.7378,-7.2631
+ORD-007,Gita Gutawa,08134455667,Jl. Asia Afrika Bandung,Customer G,107.6098,-6.9211`;
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'Sample_Data_Routerra_id.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function extractCityFromAddress(address) {
+            if (!address) return 'Lainnya';
+
+            const knownCities = [
+                'Jakarta Pusat', 'Jakarta Selatan', 'Jakarta Barat', 'Jakarta Timur', 'Jakarta Utara', 'Jakarta',
+                'Surabaya', 'Bandung', 'Bekasi', 'Tangerang', 'Depok', 'Bogor', 'Semarang', 'Yogyakarta',
+                'Medan', 'Palembang', 'Makassar', 'Denpasar', 'Malang', 'Batam', 'Solo'
+            ];
+
+            for (const city of knownCities) {
+                if (new RegExp(`\\b${city}\\b`, 'i').test(address)) {
+                    return city;
+                }
+            }
+
+            const parts = address.split(',').map(s => s.trim());
+            if (parts.length > 1) {
+                return parts[parts.length - 1];
+            }
+
+            return 'Lainnya';
+        }
+
+        function populateCityFilterOptions() {
+            const citySelect = document.getElementById('cityFilterSelect');
+            citySelect.innerHTML = '<option value="">Semua Kota</option>';
+
+            const cities = Array.from(new Set(locations.map(loc => loc.city))).sort();
+            cities.forEach(city => {
+                const opt = document.createElement('option');
+                opt.value = city;
+                opt.innerText = city;
+                citySelect.appendChild(opt);
+            });
+        }
+
+        document.getElementById('csvFileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    locations = results.data.map((row, idx) => {
+                        const addr = row.Alamat || '-';
+                        return {
+                            id: idx + 1,
+                            orderId: row['Order ID'] || row['No Order'] || row['OrderID'] || `ORD-${String(idx + 1).padStart(4, '0')}`,
+                            name: row.Nama || 'Tanpa Nama',
+                            phone: row['No Telepon'] || '-',
+                            address: addr,
+                            city: extractCityFromAddress(addr),
+                            description: row.Keterangan || '-',
+                            latitude: parseFloat(row.Latitude),
+                            longitude: parseFloat(row.Longitude)
+                        };
+                    }).filter(item => !isNaN(item.latitude) && !isNaN(item.longitude));
+
+                    selectedIds.clear();
+                    savedBatches = [];
+                    clearPolylines();
+                    
+                    populateCityFilterOptions();
+
+                    if (locations.length > 0) {
+                        const first = locations[0];
+                        map.setView([first.latitude, first.longitude], 12);
+                    }
+                    renderData();
+
+                    document.getElementById('importedCountText').innerText = locations.length;
+                    document.getElementById('importOptionsModal').classList.remove('hidden');
+                }
+            });
+        });
+
+        function closeImportOptionsModal() {
+            document.getElementById('importOptionsModal').classList.add('hidden');
+        }
+
+        function selectBatchingMode(mode) {
+            const form = document.getElementById('autoClusterForm');
+            if (mode === 'manual') {
+                closeImportOptionsModal();
+            } else if (mode === 'auto') {
+                form.classList.remove('hidden');
+            }
+        }
+
+        function executeAutoClustering() {
+            const maxPoints = parseInt(document.getElementById('maxPointsInput').value) || 10;
+            const maxRadius = parseFloat(document.getElementById('maxRadiusInput').value) || 15;
+
+            const unvisited = [...locations];
+            savedBatches = [];
+
+            let batchIndex = 1;
+            const today = new Date().toISOString().slice(0, 10);
+
+            while (unvisited.length > 0) {
+                const seed = unvisited.shift();
+                const cluster = [seed];
+
+                let i = 0;
+                while (i < unvisited.length && cluster.length < maxPoints) {
+                    const candidate = unvisited[i];
+                    const dist = haversineDistance(seed, candidate);
+
+                    if (dist <= maxRadius) {
+                        cluster.push(candidate);
+                        unvisited.splice(i, 1);
+                    } else {
+                        i++;
+                    }
+                }
+
+                const routedCluster = optimizeRoute(cluster);
+
+                savedBatches.push({
+                    batchId: Date.now() + batchIndex,
+                    name: `Auto Batch ${batchIndex}`,
+                    date: today,
+                    notes: `Auto Generated (Maks ${maxPoints} Titik, ${maxRadius} KM)`,
+                    items: routedCluster
+                });
+
+                batchIndex++;
+            }
+
+            closeImportOptionsModal();
+            drawAllBatchPolylines();
+            renderData();
+        }
+
+        function optimizeRoute(points) {
+            const unvisited = [...points];
+            const routed = [];
+            let current = unvisited.shift();
+
+            routed.push({
+                ...current,
+                visit_order: 1,
+                distance_from_prev: 0,
+                estimated_time: 0
+            });
+
+            let order = 2;
+            while (unvisited.length > 0) {
+                let nearestIdx = 0;
+                let minDist = Infinity;
+
+                for (let i = 0; i < unvisited.length; i++) {
+                    const dist = haversineDistance(current, unvisited[i]);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        nearestIdx = i;
+                    }
+                }
+
+                current = unvisited.splice(nearestIdx, 1)[0];
+                const estTime = Math.round((minDist / 30) * 60) + 5;
+
+                routed.push({
+                    ...current,
+                    visit_order: order++,
+                    distance_from_prev: Number(minDist.toFixed(2)),
+                    estimated_time: estTime
+                });
+            }
+
+            return routed;
+        }
+
+        function openMovePointModal(locId) {
+            movingPointId = locId;
+            const loc = locations.find(l => l.id === locId);
+            if (!loc) return;
+
+            let currentBatch = null;
+            savedBatches.forEach(b => {
+                if (b.items.some(item => item.id === locId)) {
+                    currentBatch = b;
+                }
+            });
+
+            if (!currentBatch) return;
+
+            document.getElementById('movePointTargetName').innerText = `${loc.orderId} - ${loc.name}`;
+            document.getElementById('movePointCurrentBatch').innerText = `Batch Saat Ini: ${currentBatch.name}`;
+
+            const select = document.getElementById('targetBatchSelect');
+            select.innerHTML = '';
+
+            savedBatches.forEach(b => {
+                if (b.batchId !== currentBatch.batchId) {
+                    const opt = document.createElement('option');
+                    opt.value = b.batchId;
+                    opt.innerText = `${b.name} (${b.items.length} titik)`;
+                    select.appendChild(opt);
+                }
+            });
+
+            if (select.children.length === 0) {
+                alert("Tidak ada batch lain yang tersedia. Buat batch lain terlebih dahulu!");
+                return;
+            }
+
+            document.getElementById('movePointModal').classList.remove('hidden');
+        }
+
+        function closeMovePointModal() {
+            document.getElementById('movePointModal').classList.add('hidden');
+            movingPointId = null;
+        }
+
+        function executeMovePoint() {
+            if (!movingPointId) return;
+
+            const targetBatchId = parseInt(document.getElementById('targetBatchSelect').value);
+            let movedItem = null;
+
+            savedBatches.forEach(b => {
+                const idx = b.items.findIndex(item => item.id === movingPointId);
+                if (idx !== -1) {
+                    movedItem = b.items.splice(idx, 1)[0];
+                }
+            });
+
+            if (movedItem) {
+                const targetBatch = savedBatches.find(b => b.batchId === targetBatchId);
+                if (targetBatch) {
+                    const rawPoints = targetBatch.items.map(i => {
+                        const { visit_order, distance_from_prev, estimated_time, ...rest } = i;
+                        return rest;
+                    });
+                    
+                    const { visit_order, distance_from_prev, estimated_time, ...cleanMoved } = movedItem;
+                    rawPoints.push(cleanMoved);
+
+                    targetBatch.items = optimizeRoute(rawPoints);
+                }
+            }
+
+            savedBatches.forEach(b => {
+                if (b.items.length > 0) {
+                    const rawPoints = b.items.map(i => {
+                        const { visit_order, distance_from_prev, estimated_time, ...rest } = i;
+                        return rest;
+                    });
+                    b.items = optimizeRoute(rawPoints);
+                }
+            });
+
+            savedBatches = savedBatches.filter(b => b.items.length > 0);
+
+            closeMovePointModal();
+            drawAllBatchPolylines();
+            renderData();
+        }
+
+        function unbatchSinglePoint(locId) {
+            savedBatches.forEach(b => {
+                const idx = b.items.findIndex(item => item.id === locId);
+                if (idx !== -1) {
+                    b.items.splice(idx, 1);
+                }
+            });
+
+            savedBatches.forEach(b => {
+                if (b.items.length > 0) {
+                    const rawPoints = b.items.map(i => {
+                        const { visit_order, distance_from_prev, estimated_time, ...rest } = i;
+                        return rest;
+                    });
+                    b.items = optimizeRoute(rawPoints);
+                }
+            });
+
+            savedBatches = savedBatches.filter(b => b.items.length > 0);
+
+            drawAllBatchPolylines();
+            renderData();
+        }
+
+        function createCustomIcon(isSelected, isBatched, labelText, order = '') {
+            let markerClass = 'custom-marker';
+            let labelClass = 'marker-label';
+
+            if (isSelected) markerClass += ' selected';
+            if (isBatched) {
+                markerClass += ' batched';
+                labelClass += ' batched-label';
+            }
+
+            return L.divIcon({
+                className: '',
+                html: `
+                    <div class="marker-wrapper">
+                        <div class="${labelClass}">${labelText}</div>
+                        <div class="${markerClass}">${order}</div>
+                    </div>
+                `,
+                iconSize: [150, 48],
+                iconAnchor: [75, 42]
+            });
+        }
+
+        function toggleUnbatchedFilter() {
+            showOnlyUnbatched = !showOnlyUnbatched;
+            const btn = document.getElementById('btnFilterUnbatched');
+            if (showOnlyUnbatched) {
+                btn.className = 'text-[10px] font-medium px-2 py-1 rounded bg-white text-black transition shrink-0 font-bold';
+                btn.innerText = '🎯 Filter: Unbatch';
+            } else {
+                btn.className = 'text-[10px] font-medium px-2 py-1 rounded bg-black text-neutral-300 border border-classic-border hover:bg-neutral-900 transition shrink-0';
+                btn.innerText = '🎯 Sisa Unbatch';
+            }
+            renderData();
+        }
+
+        function selectMarkersInBounds(bounds) {
+            const selectedCity = document.getElementById('cityFilterSelect').value;
+
+            locations.forEach(loc => {
+                if (isLocationInAnyBatch(loc.id)) return;
+                if (selectedCity !== '' && loc.city !== selectedCity) return;
+
+                const latLng = L.latLng(loc.latitude, loc.longitude);
+                if (bounds.contains(latLng)) {
+                    selectedIds.add(loc.id);
+                }
+            });
+
+            renderData();
+        }
+
+        function isLocationInAnyBatch(id) {
+            return savedBatches.some(b => b.items.some(item => item.id === id));
+        }
+
+        function toggleBoxSelectMode() {
+            isBoxSelectMode = !isBoxSelectMode;
+            const btn = document.getElementById('btnToggleBoxSelect');
+            const statusText = document.getElementById('boxSelectStatusText');
+            const dot = document.getElementById('boxSelectDot');
+
+            if (isBoxSelectMode) {
+                map.dragging.disable();
+                map.boxZoom.enable();
+                document.body.classList.add('box-select-active');
+                
+                btn.classList.replace('border-classic-border', 'border-white');
+                dot.className = 'w-2 h-2 rounded-full bg-white animate-ping';
+                statusText.innerText = 'Box Select: ON';
+            } else {
+                map.dragging.enable();
+                map.boxZoom.disable();
+                document.body.classList.remove('box-select-active');
+                
+                btn.classList.replace('border-white', 'border-classic-border');
+                dot.className = 'w-2 h-2 rounded-full bg-neutral-600';
+                statusText.innerText = 'Box Select: OFF';
+            }
+        }
+
+        function renderData() {
+            markersClusterGroup.clearLayers();
+
+            const searchQuery = document.getElementById('searchInput').value.toLowerCase();
+            const selectedCity = document.getElementById('cityFilterSelect').value;
+            const listContainer = document.getElementById('locationList');
+            listContainer.innerHTML = '';
+
+            const filteredLocations = locations.filter(loc => {
+                const matchesSearch = loc.orderId.toLowerCase().includes(searchQuery) ||
+                                      loc.name.toLowerCase().includes(searchQuery) ||
+                                      loc.phone.includes(searchQuery) ||
+                                      loc.address.toLowerCase().includes(searchQuery);
+
+                const matchesCity = selectedCity === '' || loc.city === selectedCity;
+                const isBatched = isLocationInAnyBatch(loc.id);
+
+                if (showOnlyUnbatched) {
+                    return matchesSearch && matchesCity && !isBatched;
+                }
+                return matchesSearch && matchesCity;
+            });
+
+            if (filteredLocations.length === 0 && locations.length > 0) {
+                listContainer.innerHTML = '<p class="text-xs text-neutral-500 italic">Tidak ada lokasi yang cocok.</p>';
+            }
+
+            filteredLocations.forEach(loc => {
+                const isSelected = selectedIds.has(loc.id);
+                const isBatched = isLocationInAnyBatch(loc.id);
+
+                let batchInfoText = '';
+                let batchNameOnly = '';
+                let visitOrderNum = '';
+
+                if (isBatched) {
+                    savedBatches.forEach(b => {
+                        const match = b.items.find(i => i.id === loc.id);
+                        if (match) {
+                            batchNameOnly = b.name;
+                            visitOrderNum = match.visit_order;
+                            batchInfoText = `${b.name} (#Stop ${match.visit_order})`;
+                        }
+                    });
+                }
+
+                const markerLabelText = isBatched 
+                    ? `📦 ${batchNameOnly} (#Stop ${visitOrderNum})` 
+                    : `${loc.orderId} - ${loc.name}`;
+
+                const marker = L.marker([loc.latitude, loc.longitude], {
+                    icon: createCustomIcon(isSelected, isBatched, markerLabelText, isBatched ? visitOrderNum : '')
+                });
+
+                // POPUP INTERAKTIF KLASIK
+                marker.bindPopup(`
+                    <div class="text-white text-xs space-y-2 p-1 min-w-[180px]">
+                        <div class="border-b border-classic-border pb-1 flex justify-between items-center">
+                            <span class="bg-black border border-classic-border text-white text-[9px] font-mono font-bold px-1.5 py-0.5 rounded">📦 ID: ${loc.orderId}</span>
+                            <span class="bg-neutral-900 text-neutral-300 text-[9px] font-semibold px-1.5 py-0.5 rounded">🏙️ ${loc.city}</span>
+                        </div>
+                        <h4 class="font-bold text-sm text-white">${loc.name}</h4>
+                        ${batchInfoText ? `<p class="font-semibold text-emerald-400 bg-emerald-950/60 p-1 rounded text-[10px] border border-emerald-800">📦 ${batchInfoText}</p>` : ''}
+                        <p class="text-neutral-400">📱 <strong>Telp:</strong> ${loc.phone}</p>
+                        <p class="text-neutral-400 text-[11px]">📍 ${loc.address}</p>
+                        
+                        ${isBatched ? `
+                            <div class="pt-2 border-t border-classic-border flex gap-1.5">
+                                <button onclick="openMovePointModal(${loc.id})" class="flex-1 bg-white hover:bg-neutral-200 text-black font-bold py-1 px-2 rounded text-[10px] transition">
+                                    ✏️ Ubah Batch
+                                </button>
+                                <button onclick="unbatchSinglePoint(${loc.id})" class="bg-red-950/60 hover:bg-red-900 text-red-400 border border-red-800 font-bold py-1 px-2 rounded text-[10px] transition">
+                                    ❌ Lepas
+                                </button>
+                            </div>
+                        ` : ''}
+                    </div>
+                `);
+
+                marker.on('click', (e) => {
+                    if (isBatched) return;
+                    const isMulti = e.originalEvent.ctrlKey || e.originalEvent.shiftKey || isBoxSelectMode;
+                    toggleSelect(loc.id, isMulti);
+                });
+
+                markersClusterGroup.addLayer(marker);
+
+                // Kartu Sidebar Klasik Hitam
+                const card = document.createElement('div');
+                card.className = `p-3 rounded-lg border text-xs transition relative ${
+                    isBatched
+                        ? 'bg-emerald-950/20 border-emerald-900/40 text-neutral-400'
+                        : isSelected 
+                            ? 'bg-red-950/30 border-red-600 text-white cursor-pointer' 
+                            : 'bg-black border-classic-border hover:border-neutral-500 text-neutral-300 cursor-pointer'
+                }`;
+                
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="text-[9px] font-mono ${isSelected ? 'text-red-400 bg-red-950 border-red-800' : 'text-neutral-300 bg-classic-panel border-classic-border'} px-1.5 py-0.5 rounded border font-bold">#${loc.orderId}</span>
+                        <div class="flex gap-1 items-center">
+                            <span class="bg-neutral-900 text-neutral-400 px-1.5 py-0.5 rounded text-[9px]">🏙️ ${loc.city}</span>
+                            ${isBatched 
+                                ? `<button onclick="openMovePointModal(${loc.id})" class="bg-white text-black font-bold px-1.5 py-0.5 rounded text-[9px] hover:bg-neutral-200 transition" title="Pindahkan">⇄ Pindah</button>` 
+                                : ''}
+                        </div>
+                    </div>
+                    <p class="font-bold text-xs text-white">${loc.name}</p>
+                    <p class="text-neutral-400 text-[10px] truncate mt-0.5">${loc.address}</p>
+                    <div class="flex justify-between items-center mt-1.5">
+                        <p class="text-neutral-500 text-[9px] font-mono">${loc.phone}</p>
+                        ${isBatched ? `<span class="text-[9px] font-semibold text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-800">${batchNameOnly} (#${visitOrderNum})</span>` : ''}
+                    </div>
+                `;
+                
+                if (!isBatched) {
+                    card.onclick = (e) => toggleSelect(loc.id, e.ctrlKey || e.shiftKey);
+                }
+                listContainer.appendChild(card);
+            });
+
+            renderSavedBatchesList();
+            updateUIStats();
+        }
+
+        function toggleSelect(id, isMulti) {
+            if (isLocationInAnyBatch(id)) return;
+
+            if (isMulti) {
+                if (selectedIds.has(id)) selectedIds.delete(id);
+                else selectedIds.add(id);
+            } else {
+                if (selectedIds.has(id) && selectedIds.size === 1) {
+                    selectedIds.clear();
+                } else {
+                    selectedIds.clear();
+                    selectedIds.add(id);
+                }
+            }
+            renderData();
+        }
+
+        function openBatchModal() {
+            const count = selectedIds.size;
+            if (count === 0) return;
+            document.getElementById('modalSelectedCount').innerText = count;
+            document.getElementById('batchNameInput').value = `Batch ${savedBatches.length + 1}`;
+            document.getElementById('batchModal').classList.remove('hidden');
+        }
+
+        function closeBatchModal() {
+            document.getElementById('batchModal').classList.add('hidden');
+        }
+
+        function haversineDistance(p1, p2) {
+            const R = 6371;
+            const dLat = (p2.latitude - p1.latitude) * Math.PI / 180;
+            const dLon = (p2.longitude - p1.longitude) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(p1.latitude * Math.PI / 180) * Math.cos(p2.latitude * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        function saveBatchToList() {
+            const batchName = document.getElementById('batchNameInput').value.trim() || `Batch ${savedBatches.length + 1}`;
+            const batchDate = document.getElementById('batchDateInput').value;
+            const batchNotes = document.getElementById('batchNotesInput').value.trim();
+
+            const selectedPoints = locations.filter(loc => selectedIds.has(loc.id));
+            if (selectedPoints.length === 0) return;
+
+            const routed = optimizeRoute(selectedPoints);
+
+            savedBatches.push({
+                batchId: Date.now(),
+                name: batchName,
+                date: batchDate,
+                notes: batchNotes,
+                items: routed
+            });
+
+            selectedIds.clear();
+            closeBatchModal();
+            drawAllBatchPolylines();
+            renderData();
+        }
+
+        function renderSavedBatchesList() {
+            const container = document.getElementById('savedBatchesContainer');
+            if (savedBatches.length === 0) {
+                container.innerHTML = '<p class="text-[11px] text-neutral-500 italic">Belum ada batch tersimpan.</p>';
+                return;
+            }
+
+            container.innerHTML = '';
+            savedBatches.forEach((batch, idx) => {
+                const item = document.createElement('div');
+                item.className = 'bg-black border border-classic-border rounded-lg p-2 text-xs flex justify-between items-center';
+                item.innerHTML = `
+                    <div>
+                        <p class="font-bold text-white text-[11px]">${idx + 1}. ${batch.name}</p>
+                        <p class="text-[10px] text-neutral-400 font-mono">📍 ${batch.items.length} Titik | 📅 ${batch.date}</p>
+                    </div>
+                    <button onclick="removeBatch(${batch.batchId})" class="text-neutral-500 hover:text-red-400 font-bold px-1 text-sm transition">&times;</button>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function removeBatch(batchId) {
+            savedBatches = savedBatches.filter(b => b.batchId !== batchId);
+            drawAllBatchPolylines();
+            renderData();
+        }
+
+        function clearAllBatches() {
+            if (confirm("Apakah Anda yakin ingin menghapus semua batch yang telah disimpan?")) {
+                savedBatches = [];
+                clearPolylines();
+                renderData();
+            }
+        }
+
+        function clearPolylines() {
+            routePolylines.forEach(p => map.removeLayer(p));
+            routePolylines = [];
+        }
+
+        function drawAllBatchPolylines() {
+            clearPolylines();
+            const colors = ['#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0891b2'];
+
+            savedBatches.forEach((batch, idx) => {
+                const latLngs = batch.items.map(i => [i.latitude, i.longitude]);
+                const color = colors[idx % colors.length];
+
+                const polyline = L.polyline(latLngs, {
+                    color: color,
+                    weight: 3,
+                    dashArray: '6, 8',
+                    opacity: 0.85
+                }).addTo(map);
+
+                routePolylines.push(polyline);
+            });
+        }
+
+        function exportAllBatchesToExcel() {
+            if (savedBatches.length === 0) return;
+
+            const workbook = XLSX.utils.book_new();
+
+            const allRows = [];
+            savedBatches.forEach((batch) => {
+                batch.items.forEach((item) => {
+                    allRows.push({
+                        'Nama Batch': batch.name,
+                        'Tanggal Batch': batch.date,
+                        'Catatan Batch': batch.notes || '-',
+                        'Urutan Kunjungan': item.visit_order,
+                        'Order ID': item.orderId,
+                        'Nama Tempat/Pelanggan': item.name,
+                        'No Telepon': item.phone,
+                        'Kota': item.city,
+                        'Alamat': item.address,
+                        'Keterangan': item.description,
+                        'Latitude': item.latitude,
+                        'Longitude': item.longitude,
+                        'Jarak dari Titik Sblm (km)': item.distance_from_prev,
+                        'Estimasi Waktu (menit)': item.estimated_time
+                    });
+                });
+            });
+
+            const summarySheet = XLSX.utils.json_to_sheet(allRows);
+            XLSX.utils.book_append_sheet(workbook, summarySheet, 'Semua Batch');
+
+            savedBatches.forEach((batch, idx) => {
+                const batchRows = batch.items.map(item => ({
+                    'Urutan Kunjungan': item.visit_order,
+                    'Order ID': item.orderId,
+                    'Nama': item.name,
+                    'No Telepon': item.phone,
+                    'Kota': item.city,
+                    'Alamat': item.address,
+                    'Keterangan': item.description,
+                    'Latitude': item.latitude,
+                    'Longitude': item.longitude,
+                    'Jarak Sblm (km)': item.distance_from_prev,
+                    'Estimasi (menit)': item.estimated_time
+                }));
+
+                const sheetName = `Batch_${idx + 1}`.slice(0, 31);
+                const batchSheet = XLSX.utils.json_to_sheet(batchRows);
+                XLSX.utils.book_append_sheet(workbook, batchSheet, sheetName);
+            });
+
+            const customInput = document.getElementById('exportFileNameInput').value.trim();
+            const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+            
+            let filename = customInput !== '' 
+                ? `${customInput}.xlsx` 
+                : `Routerra_id_Batches_${dateStr}.xlsx`;
+
+            if (!filename.toLowerCase().endsWith('.xlsx')) {
+                filename += '.xlsx';
+            }
+
+            XLSX.writeFile(workbook, filename);
+        }
+
+        function updateUIStats() {
+            const total = locations.length;
+            const batchedCount = savedBatches.reduce((acc, b) => acc + b.items.length, 0);
+            const unbatched = total - batchedCount;
+            const percent = total > 0 ? Math.round((batchedCount / total) * 100) : 0;
+
+            document.getElementById('totalCount').innerText = total;
+            document.getElementById('unbatchedCount').innerText = unbatched;
+            document.getElementById('selectedCountBtn').innerText = selectedIds.size;
+            document.getElementById('savedBatchCount').innerText = savedBatches.length;
+
+            document.getElementById('progressText').innerText = `${batchedCount} / ${total} (${percent}%)`;
+            document.getElementById('progressBar').style.width = `${percent}%`;
+
+            document.getElementById('btnOpenBatchModal').disabled = selectedIds.size === 0;
+
+            const isAllBatched = total > 0 && unbatched === 0;
+            const btnExport = document.getElementById('btnExportAllExcel');
+            const badgeLock = document.getElementById('exportLockBadge');
+            const hintText = document.getElementById('progressStatusHint');
+
+            btnExport.disabled = !isAllBatched;
+
+            if (isAllBatched) {
+                badgeLock.innerText = 'Ready';
+                badgeLock.className = 'bg-emerald-950 text-[9px] px-1.5 py-0.5 rounded text-emerald-400 font-mono font-bold';
+                hintText.innerText = '✅ Semua titik telah dibatch! Siap di-export.';
+                hintText.className = 'text-[10px] text-emerald-400 font-medium';
+            } else {
+                badgeLock.innerText = `Sisa ${unbatched}`;
+                badgeLock.className = 'bg-neutral-900 text-[9px] px-1.5 py-0.5 rounded text-amber-400 font-mono';
+                hintText.innerText = '⚠️ Lengkapi batching semua titik untuk mengunduh Excel.';
+                hintText.className = 'text-[10px] text-classic-muted italic';
+            }
+        }
+
+        document.getElementById('searchInput').addEventListener('input', () => renderData());
+        
+        window.onload = function() {
+            initMap();
+            openTutorialModal();
+        };
+    </script>
+</body>
+</html>
