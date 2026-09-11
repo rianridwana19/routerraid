@@ -62,6 +62,11 @@
         </div>
 
         <div class="flex items-center gap-3">
+            <button onclick="toggleModal('welcomeModal')" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-2 rounded-lg flex items-center gap-2 transition font-medium">
+                <i class="fa-solid fa-circle-question"></i>
+                <span>Panduan & Contoh CSV</span>
+            </button>
+
             <button onclick="toggleModal('apiKeyModal')" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs px-3 py-2 rounded-lg flex items-center gap-2 transition">
                 <i class="fa-solid fa-key text-amber-400"></i>
                 <span id="apiKeyStatus">Google Maps API Key</span>
@@ -89,7 +94,7 @@
                         <i class="fa-solid fa-file-csv text-base"></i>
                         <span>Upload File CSV</span>
                     </button>
-                    <button onclick="loadSampleData()" title="Muat Data Sampel" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs p-2.5 rounded-lg transition">
+                    <button onclick="loadSampleData()" title="Muat Data Sampel Langsung" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs p-2.5 rounded-lg transition">
                         <i class="fa-solid fa-vial"></i>
                     </button>
                 </div>
@@ -167,7 +172,7 @@
                     </div>
                     <div id="emptyUnbatched" class="text-center py-10 text-emerald-600 text-xs font-medium">
                         <i class="fa-solid fa-circle-check text-3xl mb-2 text-emerald-500"></i>
-                        <p>Luar biasa! Semua order sudah ter-batching dengan sempurna.</p>
+                        <p>Semua order sudah ter-batching!</p>
                     </div>
                     <div id="unbatchedList" class="space-y-2"></div>
                 </div>
@@ -240,9 +245,87 @@
         </main>
     </div>
 
-    <!-- MODAL: Custom Alert Modal (Center) -->
+    <!-- MODAL AWAL: WELCOME & TUTORIAL USER -->
+    <div id="welcomeModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[4000] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-6 space-y-5 border border-slate-100 animate-in fade-in zoom-in duration-200">
+            <div class="flex justify-between items-start border-b pb-3">
+                <div class="flex items-center gap-3">
+                    <div class="bg-indigo-100 text-indigo-600 p-3 rounded-xl text-xl">
+                        <i class="fa-solid fa-rocket"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-lg text-slate-800">Selamat Datang di Routerra Pro</h3>
+                        <p class="text-xs text-slate-500">Panduan Ringkas Penggunaan Sistem Routing & Batching</p>
+                    </div>
+                </div>
+                <button onclick="toggleModal('welcomeModal')" class="text-slate-400 hover:text-slate-600 text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- Content Langkah Penggunaan -->
+            <div class="space-y-3 text-xs text-slate-600 max-h-80 overflow-y-auto custom-scrollbar pr-1">
+                <div class="flex gap-3 items-start bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    <span class="bg-indigo-600 text-white w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] flex-shrink-0 mt-0.5">1</span>
+                    <div>
+                        <strong class="text-slate-800">Upload File CSV Data Order</strong>
+                        <p class="text-slate-500 mt-0.5">Siapkan file CSV berisi kolom: <code class="bg-slate-200 px-1 py-0.5 rounded text-indigo-700">order_id</code>, <code class="bg-slate-200 px-1 py-0.5 rounded text-indigo-700">name</code>, <code class="bg-slate-200 px-1 py-0.5 rounded text-indigo-700">address</code>, <code class="bg-slate-200 px-1 py-0.5 rounded text-indigo-700">city</code>, dan opsional (<code class="bg-slate-200 px-1 py-0.5 rounded">lat</code>, <code class="bg-slate-200 px-1 py-0.5 rounded">lng</code>).</p>
+                    </div>
+                </div>
+
+                <div class="flex gap-3 items-start bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    <span class="bg-indigo-600 text-white w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] flex-shrink-0 mt-0.5">2</span>
+                    <div>
+                        <strong class="text-slate-800">Proses Geocoding Titik Lokasi</strong>
+                        <p class="text-slate-500 mt-0.5">Klik tombol <strong>"Geocode Alamat"</strong> untuk mengonversi alamat tertulis menjadi koordinat peta secara otomatis.</p>
+                    </div>
+                </div>
+
+                <div class="flex gap-3 items-start bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    <span class="bg-indigo-600 text-white w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] flex-shrink-0 mt-0.5">3</span>
+                    <div>
+                        <strong class="text-slate-800">Auto Batching atau Seleksi Peta Area (Draw Polygon)</strong>
+                        <p class="text-slate-500 mt-0.5">Gunakan tombol <strong>"Auto Batch"</strong> berdasar radius, atau seleksi manual dengan menggambar polygon/kotak pada peta menggunakan alat di pojok kiri atas peta.</p>
+                    </div>
+                </div>
+
+                <div class="flex gap-3 items-start bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    <span class="bg-indigo-600 text-white w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] flex-shrink-0 mt-0.5">4</span>
+                    <div>
+                        <strong class="text-slate-800">Ekspor Laporan ke Excel</strong>
+                        <p class="text-slate-500 mt-0.5">Setelah pengelompokan selesai, klik tombol <strong>"Ekspor Excel"</strong> untuk mengunduh rekapitulasi data lengkap terurut per Batch.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Download Contoh CSV CTA -->
+            <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-file-csv text-amber-600 text-xl"></i>
+                    <div>
+                        <p class="text-xs font-bold text-amber-900">Belum Punya File CSV Contoh?</p>
+                        <p class="text-[11px] text-amber-700">Unduh file struktur CSV siap pakai untuk dicoba.</p>
+                    </div>
+                </div>
+                <button onclick="downloadSampleCSV()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5 shadow-sm transition">
+                    <i class="fa-solid fa-download"></i>
+                    <span>Download CSV</span>
+                </button>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex justify-end gap-2 pt-1 border-t">
+                <button onclick="loadSampleData(); toggleModal('welcomeModal');" class="px-4 py-2 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition">
+                    Coba Demo Data Langsung
+                </button>
+                <button onclick="toggleModal('welcomeModal')" class="px-5 py-2 text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-md transition">
+                    Saya Mengerti & Mulai
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Custom Alert Modal -->
     <div id="customAlertModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[3000] flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4 border border-slate-100 animate-in fade-in zoom-in duration-150">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4 border border-slate-100">
             <div class="mx-auto bg-indigo-100 text-indigo-600 w-12 h-12 rounded-full flex items-center justify-center text-xl">
                 <i class="fa-solid fa-circle-info"></i>
             </div>
@@ -412,6 +495,27 @@
         document.addEventListener("DOMContentLoaded", () => {
             initMap();
         });
+
+        // Fungsi Download Otomatis Contoh CSV
+        function downloadSampleCSV() {
+            const csvContent = 
+`order_id,name,phone,address,city,notes,lat,lng
+AWB101,Budi Santoso,081234567890,Jl. Jend. Sudirman No. 1,Jakarta Pusat,Fragile,-6.2185,106.8180
+AWB102,Siti Rahma,082198765432,Jl. MH Thamrin No. 28,Jakarta Pusat,Kirim Siang,-6.1950,106.8230
+AWB103,Ahmad Dahlan,085711223344,Jl. Gatot Subroto No. 45,Jakarta Selatan,Lantai 3,-6.2300,106.8150
+AWB104,Dewi Lestari,081344556677,Jl. Rasuna Said Blok C,Jakarta Selatan,Titip Security,-6.2220,106.8320
+AWB105,Eko Prasetyo,087899001122,Jl. Tebet Raya No. 10,Jakarta Selatan,-,-6.2270,106.8530
+AWB106,Fajar Nugraha,089633445566,Jl. Casablanka No. 88,Jakarta Selatan,Panggil dulu,-6.2240,106.8430`;
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", "Contoh_Data_Order_Routerra.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
 
         function getNextBatchNumber() {
             if (batchesData.length === 0) return 1;
@@ -1129,7 +1233,7 @@
                     className: 'big-marker-pin',
                     html: `
                         <div class="relative flex flex-col items-center">
-                            <!-- Badge Batch (Posisi Kanan Atas & Font Lebih Besar 2 Tingkat) -->
+                            <!-- Badge Batch -->
                             <span style="background-color: ${color};" class="absolute -top-1 -right-12 text-white text-xs font-bold px-2 py-1 rounded-md shadow-md border border-white whitespace-nowrap z-20">
                                 ${batchLabel}
                             </span>
@@ -1139,7 +1243,7 @@
                                 ${isSelected ? '<i class="fa-solid fa-check text-amber-300"></i>' : '<i class="fa-solid fa-location-dot text-base"></i>'}
                             </div>
 
-                            <!-- Label Order ID (Font Lebih Besar 2 Tingkat) -->
+                            <!-- Label Order ID -->
                             <span class="bg-slate-900/95 text-white text-xs font-black px-2.5 py-1 rounded-md shadow-md mt-1 whitespace-nowrap border border-slate-700 z-10">
                                 ${o.id}
                             </span>
