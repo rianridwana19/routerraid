@@ -15,6 +15,11 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+    <!-- Leaflet MarkerCluster CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
     <!-- Leaflet Draw CSS & JS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
@@ -283,7 +288,7 @@
                     <span class="bg-indigo-600 text-white w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] flex-shrink-0 mt-0.5">3</span>
                     <div>
                         <strong class="text-slate-800">Auto Batching atau Seleksi Peta Area (Draw Polygon)</strong>
-                        <p class="text-slate-500 mt-0.5">Gunakan tombol <strong>"Auto Batch"</strong> berdasar radius, atau seleksi manual dengan menggambar polygon/kotak pada peta menggunakan alat di pojok kiri atas peta.</p>
+                        <p class="text-slate-500 mt-0.5">Gunakan tombol <strong>"Auto Batch"</strong> berdasar jumlah kelompok (K-Means Clustering), atau seleksi manual dengan menggambar polygon/kotak pada peta menggunakan alat di pojok kiri atas peta.</p>
                     </div>
                 </div>
 
@@ -350,7 +355,7 @@
                 <button onclick="toggleModal('apiKeyModal')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <p class="text-xs text-slate-600 leading-relaxed">
-                Masukkan Google Maps API Key (Geocoding API) untuk presisi 100% tingkat nomor rumah.
+                Masukkan Google Maps API Key (Geocoding API) untuk presisi tinggi tingkat nomor rumah.
             </p>
             <div>
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Google Maps API Key</label>
@@ -368,18 +373,15 @@
         <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-5">
             <div class="flex justify-between items-center border-b pb-3">
                 <h3 class="font-bold text-xl text-slate-800 flex items-center gap-2">
-                    <i class="fa-solid fa-object-group text-indigo-600"></i> Generate Batching Auto
+                    <i class="fa-solid fa-object-group text-indigo-600"></i> Auto Batching (Turf.js K-Means)
                 </h3>
                 <button onclick="toggleModal('batchModal')" class="text-slate-400 hover:text-slate-600 text-lg"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1">Maksimal Radius Jarak (KM)</label>
-                    <input type="number" id="batchRadius" value="5" min="0.1" step="0.5" class="w-full text-sm border border-slate-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 outline-none">
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1">Maksimal Titik Koordinat / Batch</label>
-                    <input type="number" id="batchMaxPoints" value="10" min="1" class="w-full text-sm border border-slate-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Jumlah Batch / Cluster yang Diinginkan</label>
+                    <input type="number" id="batchClusterCount" value="3" min="1" max="20" class="w-full text-sm border border-slate-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <p class="text-[11px] text-slate-500 mt-1">Sistem akan membagi kelompok titik secara geografis berdasar algoritma K-Means Clustering.</p>
                 </div>
             </div>
             <div class="flex justify-end gap-2 pt-3">
@@ -480,12 +482,12 @@
         </div>
     </div>
 
-    <!-- JavaScript Logic -->
+    <!-- JavaScript Logic Disempurnakan -->
     <script>
         let ordersData = [];
         let batchesData = [];
         let selectedOrderIds = new Set();
-        let map, markersGroup, drawControl, drawnItems;
+        let map, markersClusterGroup, drawControl, drawnItems;
         let googleApiKey = '';
         let targetBatchToDelete = null;
         let currentActiveTab = 'orders';
@@ -495,6 +497,9 @@
         document.addEventListener("DOMContentLoaded", () => {
             initMap();
         });
+
+        // Helper Delay Async untuk Throttling Geocoder
+        const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
         // Fungsi Download Otomatis Contoh CSV
         function downloadSampleCSV() {
@@ -544,7 +549,12 @@ AWB106,Fajar Nugraha,089633445566,Jl. Casablanka No. 88,Jakarta Selatan,Panggil 
                 attribution: '&copy; OpenStreetMap contributors'
             }).addTo(map);
 
-            markersGroup = L.layerGroup().addTo(map);
+            // Penggunaan MarkerClusterGroup untuk optimasi visual peta
+            markersClusterGroup = L.markerClusterGroup({
+                disableClusteringAtZoom: 15,
+                spiderfyOnMaxZoom: true
+            });
+            map.addLayer(markersClusterGroup);
 
             drawnItems = new L.FeatureGroup();
             map.addLayer(drawnItems);
@@ -691,6 +701,7 @@ AWB106,Fajar Nugraha,089633445566,Jl. Casablanka No. 88,Jakarta Selatan,Panggil 
                 notes: item.notes || item.catatan || '',
                 lat: item.lat ? parseFloat(item.lat) : null,
                 lng: item.lng || item.long ? parseFloat(item.lng || item.long) : null,
+                geocodeStatus: item.lat && item.lng ? 'success' : 'pending',
                 batchId: null
             }));
 
@@ -866,13 +877,23 @@ AWB106,Fajar Nugraha,089633445566,Jl. Casablanka No. 88,Jakarta Selatan,Panggil 
                 const query = `${item.address}, ${item.city}`;
 
                 let coords = null;
-                if (googleApiKey) coords = await geocodeGoogle(query);
-                if (!coords) coords = await geocodeArcGIS(query);
-                if (!coords) coords = await geocodeNominatim(query);
+                if (googleApiKey) {
+                    coords = await geocodeGoogle(query);
+                } else {
+                    coords = await geocodeArcGIS(query);
+                    if (!coords) {
+                        // Throttling 1.000 ms khusus Nominatim (OpenStreetMap Usage Policy)
+                        await sleep(1000); 
+                        coords = await geocodeNominatim(query);
+                    }
+                }
 
                 if (coords) {
                     item.lat = coords.lat;
                     item.lng = coords.lng;
+                    item.geocodeStatus = 'success';
+                } else {
+                    item.geocodeStatus = 'failed';
                 }
 
                 const percent = Math.round(((i + 1) / ungeocoded.length) * 100);
@@ -922,16 +943,6 @@ AWB106,Fajar Nugraha,089633445566,Jl. Casablanka No. 88,Jakarta Selatan,Panggil 
             return null;
         }
 
-        function getDistanceKm(lat1, lon1, lat2, lon2) {
-            const R = 6371;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
-            return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
-        }
-
         function openBatchModal() {
             const valid = ordersData.filter(o => o.lat && o.lng);
             if (valid.length === 0) {
@@ -941,47 +952,47 @@ AWB106,Fajar Nugraha,089633445566,Jl. Casablanka No. 88,Jakarta Selatan,Panggil 
             toggleModal('batchModal');
         }
 
+        // Pengelompokan Menggunakan Turf.js K-Means Clustering
         function processBatching() {
-            const maxRadius = parseFloat(document.getElementById('batchRadius').value) || 5;
-            const maxPoints = parseInt(document.getElementById('batchMaxPoints').value) || 10;
-
+            const clusterCount = parseInt(document.getElementById('batchClusterCount').value) || 3;
             const validOrders = ordersData.filter(o => o.lat && o.lng);
-            let unassigned = [...validOrders];
+
+            if (validOrders.length < clusterCount) {
+                showAlert(`Jumlah titik koordinat valid (${validOrders.length}) lebih sedikit dari jumlah cluster (${clusterCount})!`);
+                return;
+            }
+
+            const pointsArr = validOrders.map(o => turf.point([o.lng, o.lat], { id: o.id }));
+            const featureColl = turf.featureCollection(pointsArr);
+
+            const clustered = turf.clustersKmeans(featureColl, { numberOfClusters: clusterCount });
+
             batchesData = [];
+            const newBatchesMap = {};
 
-            let batchCount = 1;
-
-            while (unassigned.length > 0) {
-                const seed = unassigned[0];
-                const currentBatch = {
-                    id: `Batch-${batchCount}`,
-                    name: `Batch ${batchCount}`,
-                    color: BATCH_COLORS[(batchCount - 1) % BATCH_COLORS.length],
+            for (let i = 1; i <= clusterCount; i++) {
+                const bId = `Batch-${i}`;
+                const newBatch = {
+                    id: bId,
+                    name: `Batch ${i}`,
+                    color: BATCH_COLORS[(i - 1) % BATCH_COLORS.length],
                     orderIds: []
                 };
-
-                unassigned.sort((a, b) => {
-                    const distA = getDistanceKm(seed.lat, seed.lng, a.lat, a.lng);
-                    const distB = getDistanceKm(seed.lat, seed.lng, b.lat, b.lng);
-                    return distA - distB;
-                });
-
-                const added = [];
-                for (let item of unassigned) {
-                    const dist = getDistanceKm(seed.lat, seed.lng, item.lat, item.lng);
-                    if (dist <= maxRadius && added.length < maxPoints) {
-                        added.push(item);
-                        item.batchId = currentBatch.id;
-                    }
-                }
-
-                currentBatch.orderIds = added.map(a => a.id);
-                batchesData.push(currentBatch);
-
-                const addedIds = new Set(added.map(a => a.id));
-                unassigned = unassigned.filter(item => !addedIds.has(item.id));
-                batchCount++;
+                batchesData.push(newBatch);
+                newBatchesMap[i - 1] = newBatch;
             }
+
+            clustered.features.forEach(f => {
+                const orderId = f.properties.id;
+                const clusterIdx = f.properties.cluster;
+                const targetBatch = newBatchesMap[clusterIdx];
+
+                const order = ordersData.find(o => o.id === orderId);
+                if (order && targetBatch) {
+                    order.batchId = targetBatch.id;
+                    targetBatch.orderIds.push(order.id);
+                }
+            });
 
             toggleModal('batchModal');
             switchTab('batches');
@@ -1115,6 +1126,7 @@ AWB106,Fajar Nugraha,089633445566,Jl. Casablanka No. 88,Jakarta Selatan,Panggil 
             const badgeColor = batch ? batch.color : '#94a3b8';
             const hasCoords = o.lat && o.lng;
             const isSelected = selectedOrderIds.has(o.id);
+            const isFailed = o.geocodeStatus === 'failed';
 
             return `
                 <div class="bg-white border ${isSelected ? 'border-indigo-500 bg-indigo-50/30' : 'border-slate-200'} rounded-lg p-3 hover:border-indigo-300 transition shadow-sm relative group">
@@ -1133,9 +1145,9 @@ AWB106,Fajar Nugraha,089633445566,Jl. Casablanka No. 88,Jakarta Selatan,Panggil 
                     ${o.notes ? `<p class="text-[10px] text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 mt-1 ml-6">Catatan: ${o.notes}</p>` : ''}
                     
                     <div class="mt-2 pt-2 border-t border-slate-100 flex justify-between items-center text-[11px] pl-6">
-                        <span class="${hasCoords ? 'text-emerald-600' : 'text-rose-500'} font-medium">
-                            <i class="fa-solid ${hasCoords ? 'fa-circle-check' : 'fa-triangle-exclamation'}"></i>
-                            ${hasCoords ? 'Ter-geocoding' : 'Belum ada kordinat'}
+                        <span class="${hasCoords ? 'text-emerald-600' : isFailed ? 'text-rose-600 font-bold' : 'text-amber-500'} font-medium">
+                            <i class="fa-solid ${hasCoords ? 'fa-circle-check' : isFailed ? 'fa-circle-xmark' : 'fa-triangle-exclamation'}"></i>
+                            ${hasCoords ? 'Ter-geocoding' : isFailed ? 'Gagal Geocode' : 'Belum ada kordinat'}
                         </span>
                         ${hasCoords ? `<button onclick="focusMap('${o.id}')" class="text-slate-500 hover:text-emerald-600 px-1.5 py-0.5 rounded bg-slate-50 hover:bg-emerald-50 border border-slate-200"><i class="fa-solid fa-crosshairs"></i></button>` : ''}
                     </div>
@@ -1205,7 +1217,7 @@ AWB106,Fajar Nugraha,089633445566,Jl. Casablanka No. 88,Jakarta Selatan,Panggil 
                             ${batchOrders.map(o => `
                                 <div class="flex justify-between items-center bg-slate-50 text-[11px] p-1.5 rounded border border-slate-100">
                                     <div class="truncate mr-2">
-                                        <span class="font-semibold text-slate-700">${o.id}</span> - ${o.name}
+                                        <span class="font-semibold text-slate-700">${o.id}</span> -${o.name}
                                     </div>
                                     <button onclick="removeOrderFromBatch('${o.id}', event)" class="text-rose-500 hover:text-rose-700 p-0.5" title="Keluarkan dari batch">
                                         <i class="fa-solid fa-circle-xmark"></i>
@@ -1219,7 +1231,7 @@ AWB106,Fajar Nugraha,089633445566,Jl. Casablanka No. 88,Jakarta Selatan,Panggil 
         }
 
         function renderMapMarkers() {
-            markersGroup.clearLayers();
+            markersClusterGroup.clearLayers();
 
             ordersData.forEach(o => {
                 if (!o.lat || !o.lng) return;
@@ -1273,7 +1285,7 @@ AWB106,Fajar Nugraha,089633445566,Jl. Casablanka No. 88,Jakarta Selatan,Panggil 
                 `;
 
                 const marker = L.marker([o.lat, o.lng], { icon: svgIcon }).bindPopup(popupHtml);
-                markersGroup.addLayer(marker);
+                markersClusterGroup.addLayer(marker);
             });
         }
 
