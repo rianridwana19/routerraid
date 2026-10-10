@@ -250,7 +250,7 @@
         </main>
     </div>
 
-    <!-- MODAL: ATUR TITIK PICKUP / GUDANG DEPOT -->
+    <!-- MODAL: ATUR TITIK PICKUP / GUDANG DEPOT (DUAL METHOD: ALAMAT & LAT/LONG) -->
     <div id="depotModal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[2000] flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-100">
             <div class="flex justify-between items-center border-b pb-3">
@@ -259,16 +259,35 @@
                 </h3>
                 <button onclick="toggleModal('depotModal')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            
-            <p class="text-xs text-slate-600 leading-relaxed">
-                Tentukan lokasi awal kurir/armada saat mengambil barang untuk akurasi jarak dan estimasi waktu.
-            </p>
 
-            <div class="space-y-3">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Gudang / Depot</label>
-                    <input type="text" id="depotNameInput" value="Gudang Utama" class="w-full text-xs border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-amber-500 outline-none">
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Gudang / Depot</label>
+                <input type="text" id="depotNameInput" value="Gudang Utama" class="w-full text-xs border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-amber-500 outline-none">
+            </div>
+
+            <!-- Tab Mode Pemilihan -->
+            <div class="flex border-b border-slate-200 text-xs font-medium">
+                <button id="depotTabAddressBtn" onclick="switchDepotInputMode('address')" class="flex-1 py-2 text-amber-600 border-b-2 border-amber-500 font-bold">
+                    <i class="fa-solid fa-magnifying-glass mr-1"></i> Cari Alamat
+                </button>
+                <button id="depotTabCoordsBtn" onclick="switchDepotInputMode('coords')" class="flex-1 py-2 text-slate-500 hover:text-slate-700 border-b-2 border-transparent">
+                    <i class="fa-solid fa-compass mr-1"></i> Input Lat / Long
+                </button>
+            </div>
+
+            <!-- Mode 1: Search by Nama Jalan / Alamat -->
+            <div id="depotAddressModeSection" class="space-y-2">
+                <label class="block text-xs font-semibold text-slate-700">Nama Jalan / Alamat Gudang</label>
+                <div class="flex gap-2">
+                    <input type="text" id="depotAddressInput" placeholder="Contoh: Kubik Logistik Depok" class="flex-1 text-xs border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-amber-500 outline-none">
+                    <button onclick="searchDepotAddress()" id="btnSearchDepot" class="bg-slate-800 hover:bg-slate-900 text-white text-xs px-3.5 py-2.5 rounded-lg font-semibold flex items-center gap-1.5 transition whitespace-nowrap">
+                        <i class="fa-solid fa-magnifying-glass"></i> Cari
+                    </button>
                 </div>
+            </div>
+
+            <!-- Mode 2: Search by Lat/Long Manual -->
+            <div id="depotCoordsModeSection" class="hidden space-y-2">
                 <div class="grid grid-cols-2 gap-2">
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Latitude</label>
@@ -279,10 +298,19 @@
                         <input type="number" step="any" id="depotLngInput" placeholder="106.8456" class="w-full text-xs border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-amber-500 outline-none">
                     </div>
                 </div>
+                <button onclick="applyManualCoords()" class="w-full bg-slate-800 hover:bg-slate-900 text-white text-xs py-2 rounded-lg font-semibold transition">
+                    <i class="fa-solid fa-arrows-to-dot mr-1"></i> Terapkan Koordinat Ini
+                </button>
             </div>
 
-            <div class="bg-amber-50 p-3 rounded-lg border border-amber-200 flex items-center justify-between">
-                <span class="text-xs text-amber-800 font-medium">Atau tentukan titik di peta:</span>
+            <!-- Status Titik Terpasang -->
+            <div id="depotStatusText" class="text-[11px] font-medium text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-200 flex items-center justify-between">
+                <span><i class="fa-solid fa-location-dot text-amber-500 mr-1"></i>Gudang terpasang:</span>
+                <strong id="depotCurrentCoords" class="font-mono text-slate-800">-6.20880, 106.84560</strong>
+            </div>
+
+            <div class="bg-amber-50 p-2.5 rounded-lg border border-amber-200 flex items-center justify-between">
+                <span class="text-xs text-amber-800 font-medium">Atau tentukan langsung di peta:</span>
                 <button onclick="enableClickToSetDepot()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition shadow-sm">
                     <i class="fa-solid fa-map-pin mr-1"></i> Klik di Peta
                 </button>
@@ -311,13 +339,12 @@
                 <button onclick="toggleModal('welcomeModal')" class="text-slate-400 hover:text-slate-600 text-lg"><i class="fa-solid fa-xmark"></i></button>
             </div>
 
-            <!-- Content Langkah Penggunaan -->
             <div class="space-y-3 text-xs text-slate-600 max-h-80 overflow-y-auto custom-scrollbar pr-1">
                 <div class="flex gap-3 items-start bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                     <span class="bg-indigo-600 text-white w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] flex-shrink-0 mt-0.5">1</span>
                     <div>
                         <strong class="text-slate-800">Set Titik Pickup / Gudang Utama</strong>
-                        <p class="text-slate-500 mt-0.5">Atur lokasi awal penjemputan barang di tombol warna oranye pada bagian atas.</p>
+                        <p class="text-slate-500 mt-0.5">Atur lokasi penjemputan barang menggunakan Alamat, Lat/Long, atau Klik Peta.</p>
                     </div>
                 </div>
 
@@ -325,7 +352,7 @@
                     <span class="bg-indigo-600 text-white w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] flex-shrink-0 mt-0.5">2</span>
                     <div>
                         <strong class="text-slate-800">Upload File CSV Data Order & Geocode</strong>
-                        <p class="text-slate-500 mt-0.5">Upload CSV dan jalankan <strong>"Geocode Alamat"</strong> untuk mengonversi alamat menjadi titik koordinat.</p>
+                        <p class="text-slate-500 mt-0.5">Upload CSV dan jalankan <strong>"Geocode Alamat"</strong> untuk mengonversi alamat penerima menjadi koordinat.</p>
                     </div>
                 </div>
 
@@ -333,7 +360,7 @@
                     <span class="bg-indigo-600 text-white w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] flex-shrink-0 mt-0.5">3</span>
                     <div>
                         <strong class="text-slate-800">Auto Batching (Titik & Radius)</strong>
-                        <p class="text-slate-500 mt-0.5">Sistem membagi kelompok lokasi berdasarkan batas titik dan jarak radius (KM) secara intuitif.</p>
+                        <p class="text-slate-500 mt-0.5">Sistem membagi kelompok lokasi berdasarkan batas titik dan jarak radius (KM) secara otomatis.</p>
                     </div>
                 </div>
 
@@ -346,7 +373,6 @@
                 </div>
             </div>
 
-            <!-- Download Contoh CSV CTA -->
             <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <i class="fa-solid fa-file-csv text-amber-600 text-xl"></i>
@@ -361,7 +387,6 @@
                 </button>
             </div>
 
-            <!-- Action Buttons -->
             <div class="flex justify-end gap-2 pt-1 border-t">
                 <button onclick="loadSampleData(); toggleModal('welcomeModal');" class="px-4 py-2 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition">
                     Coba Demo Data Langsung
@@ -556,9 +581,9 @@
         let currentActiveTab = 'orders';
         let isSettingDepotMode = false;
 
-        // Data Titik Gudang Pickup Default (Jakarta Pusat)
         let depotData = {
-            name: "Gudang Utama (Pickup)",
+            name: "Gudang Utama",
+            address: "Jl. Jend. Sudirman, Jakarta Pusat",
             lat: -6.2088,
             lng: 106.8456
         };
@@ -642,7 +667,6 @@ AWB106,Fajar Nugraha,089633445566,Jl. Casablanka No. 88,Jakarta Selatan,Panggil 
                 selectOrdersInsidePolygon(layer);
             });
 
-            // Klik di peta untuk menetapkan lokasi Depot / Gudang
             map.on('click', function(e) {
                 if (isSettingDepotMode) {
                     depotData.lat = e.latlng.lat;
@@ -650,48 +674,121 @@ AWB106,Fajar Nugraha,089633445566,Jl. Casablanka No. 88,Jakarta Selatan,Panggil 
                     isSettingDepotMode = false;
                     map.getContainer().style.cursor = '';
                     
-                    document.getElementById('depotLatInput').value = depotData.lat.toFixed(6);
-                    document.getElementById('depotLngInput').value = depotData.lng.toFixed(6);
-                    
                     renderDepotMarker();
                     renderUI();
                     toggleModal('depotModal');
-                    showAlert("Titik Gudang Pickup berhasil diset!");
+                    showAlert("Titik Gudang Pickup berhasil diset melalui klik peta!");
                 }
             });
 
             renderDepotMarker();
         }
 
-        function enableClickToSetDepot() {
-            isSettingDepotMode = true;
-            toggleModal('depotModal');
-            map.getContainer().style.cursor = 'crosshair';
-            showAlert("Silakan klik di area peta mana saja untuk menentukan lokasi Gudang Pickup.");
+        function switchDepotInputMode(mode) {
+            const addressSec = document.getElementById('depotAddressModeSection');
+            const coordsSec = document.getElementById('depotCoordsModeSection');
+            const tabAddressBtn = document.getElementById('depotTabAddressBtn');
+            const tabCoordsBtn = document.getElementById('depotTabCoordsBtn');
+
+            if (mode === 'address') {
+                addressSec.classList.remove('hidden');
+                coordsSec.classList.add('hidden');
+                tabAddressBtn.className = "flex-1 py-2 text-amber-600 border-b-2 border-amber-500 font-bold";
+                tabCoordsBtn.className = "flex-1 py-2 text-slate-500 hover:text-slate-700 border-b-2 border-transparent";
+            } else {
+                addressSec.classList.add('hidden');
+                coordsSec.classList.remove('hidden');
+                tabCoordsBtn.className = "flex-1 py-2 text-amber-600 border-b-2 border-amber-500 font-bold";
+                tabAddressBtn.className = "flex-1 py-2 text-slate-500 hover:text-slate-700 border-b-2 border-transparent";
+                
+                document.getElementById('depotLatInput').value = depotData.lat;
+                document.getElementById('depotLngInput').value = depotData.lng;
+            }
         }
 
-        function saveDepotLocation() {
-            const name = document.getElementById('depotNameInput').value.trim() || 'Gudang Utama';
-            const lat = parseFloat(document.getElementById('depotLatInput').value);
-            const lng = parseFloat(document.getElementById('depotLngInput').value);
-
-            if (isNaN(lat) || isNaN(lng)) {
-                showAlert("Koordinat Latitude dan Longitude Gudang tidak valid!");
+        async function searchDepotAddress() {
+            const query = document.getElementById('depotAddressInput').value.trim();
+            if (!query) {
+                showAlert("Masukkan nama jalan atau alamat gudang terlebih dahulu!");
                 return;
             }
 
-            depotData.name = name;
+            const btn = document.getElementById('btnSearchDepot');
+            btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Memuat...`;
+
+            let coords = null;
+            if (googleApiKey) {
+                coords = await geocodeGoogle(query);
+            } else {
+                coords = await geocodeArcGIS(query);
+                if (!coords) {
+                    coords = await geocodeNominatim(query);
+                }
+            }
+
+            btn.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i> Cari`;
+
+            if (coords) {
+                depotData.lat = coords.lat;
+                depotData.lng = coords.lng;
+                depotData.address = query;
+
+                renderDepotMarker();
+                map.setView([depotData.lat, depotData.lng], 14, { animate: true });
+                showAlert("Lokasi Gudang ditemukan!");
+            } else {
+                showAlert("Alamat tidak ditemukan! Gunakan pencarian nama kota yang lebih spesifik atau coba input koordinat/klik di peta.");
+            }
+        }
+
+        function applyManualCoords() {
+            const lat = parseFloat(document.getElementById('depotLatInput').value);
+            const lng = parseFloat(document.getElementById('depotLngInput').value);
+
+            if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                showAlert("Koordinat Latitude (-90 s/d 90) atau Longitude (-180 s/d 180) tidak valid!");
+                return;
+            }
+
             depotData.lat = lat;
             depotData.lng = lng;
 
             renderDepotMarker();
-            renderUI();
+            map.setView([depotData.lat, depotData.lng], 14, { animate: true });
+            showAlert("Koordinat berhasil diterapkan ke peta!");
+        }
+
+        function enableClickToSetDepot() {
+            isSettingDepotMode = true;
             toggleModal('depotModal');
-            showAlert("Informasi Titik Gudang Pickup berhasil diperbarui.");
+            map.getContainer().style.cursor = 'crosshair';
+            showAlert("Silakan klik pada area peta untuk menentukan posisi Gudang Pickup.");
+        }
+
+        function saveDepotLocation() {
+            const name = document.getElementById('depotNameInput').value.trim() || 'Gudang Utama';
+            depotData.name = name;
+
+            // Jika posisi di input coords diisi saat simpan
+            const inputLat = parseFloat(document.getElementById('depotLatInput').value);
+            const inputLng = parseFloat(document.getElementById('depotLngInput').value);
+
+            if (!isNaN(inputLat) && !isNaN(inputLng)) {
+                depotData.lat = inputLat;
+                depotData.lng = inputLng;
+            }
+
+            renderDepotMarker();
+            renderUI();
+            map.setView([depotData.lat, depotData.lng], 13);
+            toggleModal('depotModal');
+            showAlert("Informasi Gudang Pickup berhasil disimpan.");
         }
 
         function renderDepotMarker() {
-            if (depotMarker) map.removeLayer(depotMarker);
+            if (depotMarker) {
+                map.removeLayer(depotMarker);
+            }
 
             const depotIcon = L.divIcon({
                 className: 'big-marker-pin',
@@ -709,19 +806,22 @@ AWB106,Fajar Nugraha,089633445566,Jl. Casablanka No. 88,Jakarta Selatan,Panggil 
                 iconAnchor: [30, 20]
             });
 
-            depotMarker = L.marker([depotData.lat, depotData.lng], { icon: depotIcon })
-                .bindPopup(`
-                    <div class="p-2 space-y-1">
-                        <span class="font-bold text-sm text-amber-800"><i class="fa-solid fa-warehouse mr-1"></i>${depotData.name}</span>
-                        <p class="text-xs text-slate-500">Titik Awal Pickup / Penjemputan Barang</p>
-                        <p class="text-[11px] text-slate-400 font-mono">${depotData.lat.toFixed(5)}, ${depotData.lng.toFixed(5)}</p>
-                    </div>
-                `).addTo(map);
+            depotMarker = L.marker([depotData.lat, depotData.lng], { 
+                icon: depotIcon,
+                zIndexOffset: 2000 
+            }).bindPopup(`
+                <div class="p-2 space-y-1">
+                    <span class="font-bold text-sm text-amber-800"><i class="fa-solid fa-warehouse mr-1"></i>${depotData.name}</span>
+                    <p class="text-xs text-slate-500">Titik Pickup / Penjemputan Barang</p>
+                    <p class="text-[11px] text-slate-600 font-mono">${depotData.lat.toFixed(5)}, ${depotData.lng.toFixed(5)}</p>
+                </div>
+            `).addTo(map);
 
-            document.getElementById('depotLatInput').value = depotData.lat;
-            document.getElementById('depotLngInput').value = depotData.lng;
             document.getElementById('depotNameInput').value = depotData.name;
             document.getElementById('depotBtnText').innerText = depotData.name;
+            document.getElementById('depotCurrentCoords').innerText = `${depotData.lat.toFixed(5)}, ${depotData.lng.toFixed(5)}`;
+            document.getElementById('depotLatInput').value = depotData.lat;
+            document.getElementById('depotLngInput').value = depotData.lng;
         }
 
         function selectOrdersInsidePolygon(layer) {
@@ -1081,7 +1181,6 @@ AWB106,Fajar Nugraha,089633445566,Jl. Casablanka No. 88,Jakarta Selatan,Panggil 
             toggleModal('batchModal');
         }
 
-        // ESTIMASI JARAK DAN WAKTU DIHITUNG DARI TITIK GUDANG PICKUP
         function calculateBatchEstimates(batch) {
             const batchOrders = ordersData.filter(o => batch.orderIds.includes(o.id) && o.lat && o.lng);
             if (batchOrders.length === 0) {
@@ -1093,12 +1192,10 @@ AWB106,Fajar Nugraha,089633445566,Jl. Casablanka No. 88,Jakarta Selatan,Panggil 
 
             let totalDistance = 0;
             
-            // Jarak awal dari Gudang Pickup ke Titik Pertama
             const depotPoint = turf.point([depotData.lng, depotData.lat]);
             const firstPoint = turf.point([batchOrders[0].lng, batchOrders[0].lat]);
             totalDistance += turf.distance(depotPoint, firstPoint, { units: 'kilometers' });
 
-            // Jarak antar titik penerima
             for (let i = 0; i < batchOrders.length - 1; i++) {
                 const pt1 = turf.point([batchOrders[i].lng, batchOrders[i].lat]);
                 const pt2 = turf.point([batchOrders[i+1].lng, batchOrders[i+1].lat]);
@@ -1124,7 +1221,6 @@ AWB106,Fajar Nugraha,089633445566,Jl. Casablanka No. 88,Jakarta Selatan,Panggil 
             };
         }
 
-        // BATCHING BERBASIS GUDANG PICKUP + RADIUS & KAPASITAS TITIK
         function processBatching() {
             const maxPoints = parseInt(document.getElementById('maxPointsPerBatch').value) || 10;
             const maxRadius = parseFloat(document.getElementById('maxRadiusKm').value) || 5;
@@ -1142,7 +1238,6 @@ AWB106,Fajar Nugraha,089633445566,Jl. Casablanka No. 88,Jakarta Selatan,Panggil 
             const depotPt = turf.point([depotData.lng, depotData.lat]);
 
             while (unassigned.length > 0) {
-                // Cari titik unassigned yang paling dekat ke Gudang Pickup sebagai jangkar batch
                 unassigned.sort((a, b) => {
                     const distA = turf.distance(depotPt, turf.point([a.lng, a.lat]), { units: 'kilometers' });
                     const distB = turf.distance(depotPt, turf.point([b.lng, b.lat]), { units: 'kilometers' });
@@ -1154,7 +1249,6 @@ AWB106,Fajar Nugraha,089633445566,Jl. Casablanka No. 88,Jakarta Selatan,Panggil 
 
                 const currentBatchIds = [seed.id];
 
-                // Hitung jarak calon penerima lain terhadap titik jangkar
                 let candidates = unassigned.map(o => {
                     const pt = turf.point([o.lng, o.lat]);
                     const dist = turf.distance(seedPoint, pt, { units: 'kilometers' });
@@ -1409,7 +1503,6 @@ AWB106,Fajar Nugraha,089633445566,Jl. Casablanka No. 88,Jakarta Selatan,Panggil 
                             </div>
                         </div>
 
-                        <!-- Card Estimasi Waktu Batch Dari Gudang Pickup -->
                         <div class="flex items-center justify-between text-[11px] bg-indigo-50/60 p-2 rounded-md text-indigo-900 border border-indigo-100/80">
                             <span><i class="fa-solid fa-route text-indigo-600 mr-1"></i>${estimates.distanceKm} km (dari gudang)</span>
                             <span><i class="fa-solid fa-clock text-indigo-600 mr-1"></i><strong>${estimates.formattedTime}</strong></span>
